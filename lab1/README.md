@@ -1,11 +1,10 @@
 # Lab 1: Introduction to CUDA Programming
 
 ## Setup
+Using setup from this repo https://github.com/mmajewsk-teaching/ml_env_wfiis/tree/master/ml_env204_pixi then add:
 
 ```bash
-cd lab1
-pixi install
-pixi shell
+pixi add gcc=11 gxx=11 numpy matplotlib pandas
 ```
 
 This gives you `nvcc`, `gcc`, and Python with matplotlib/pandas.
