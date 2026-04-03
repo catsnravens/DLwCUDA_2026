@@ -2,7 +2,7 @@
 
 __global__ void hello_kernel() {
     // add hello info and print block
-    printf("@TODO", blockIdx.x, threadIdx.x);
+    printf("Hello from block %d , thread %d\n", blockIdx.x, threadIdx.x);
 }
 
 int main() {

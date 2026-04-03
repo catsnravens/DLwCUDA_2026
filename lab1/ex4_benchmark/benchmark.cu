@@ -22,12 +22,20 @@ void matmul_cpu(const float *A, const float *B, float *C, int n) {
         }
 }
 
-// TODO: Implement the GPU matmul kernel.
+// Implement the GPU matmul kernel.
 // Each thread should compute one element of C at position (row, col).
 // Use blockIdx, blockDim, threadIdx to compute row and col.
 // Don't forget the bounds check (row < n && col < n).
 __global__ void matmul_gpu(const float *A, const float *B, float *C, int n) {
-    // YOUR CODE HERE
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (row < n && col < n) {
+        float sum = 0.0f;
+        for (int k = 0; k < n; k++)
+            sum += A[row * n + k] * B[k * n + col];
+        C[row * n + col] = sum;
+    }
 }
 
 void init_matrices(float *A, float *B, int n) {
@@ -65,35 +73,53 @@ int main() {
         clock_gettime(CLOCK_MONOTONIC, &t1);
         double cpu_ms = ((t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1e9) * 1000.0;
 
-        // TODO: Allocate GPU memory for d_A, d_B, d_C using cudaMalloc
+        // Allocate GPU memory for d_A, d_B, d_C using cudaMalloc
         float *d_A, *d_B, *d_C;
-        // YOUR CODE HERE
+        CUDA_CHECK(cudaMalloc(&d_A, size));
+        CUDA_CHECK(cudaMalloc(&d_B, size));
+        CUDA_CHECK(cudaMalloc(&d_C, size));
 
-        // TODO: Copy h_A and h_B to GPU using cudaMemcpy
-        // YOUR CODE HERE
 
-        // TODO: Create CUDA events for timing
+        // Copy h_A and h_B to GPU using cudaMemcpy
+
+        CUDA_CHECK(cudaMemcpy(d_A, h_A, size, cudaMemcpyHostToDevice));
+        CUDA_CHECK(cudaMemcpy(d_B, h_B, size, cudaMemcpyHostToDevice));
+
+        // Create CUDA events for timing
         cudaEvent_t start, stop;
-        // YOUR CODE HERE
+        CUDA_CHECK(cudaEventCreate(&start));
+        CUDA_CHECK(cudaEventCreate(&stop));
 
         for (int bi = 0; bi < n_blocks; bi++) {
             int bs = block_sizes[bi];
 
-            // TODO: Set up dim3 block and grid dimensions
+            // Set up dim3 block and grid dimensions
             // block should be (bs, bs), grid should cover the full n x n matrix
-            // YOUR CODE HERE
+            dim3 block(bs, bs);
+            dim3 grid((n + bs - 1) / bs, (n + bs - 1) / bs);
 
-            // TODO: Record start event, launch kernel, record stop event,
+            // Record start event, launch kernel, record stop event,
             // synchronize, and get elapsed time into gpu_ms
             float gpu_ms = 0.0f;
-            // YOUR CODE HERE
+            CUDA_CHECK(cudaEventRecord(start));
+            matmul_gpu<<<grid, block>>>(d_A, d_B, d_C, n);
+            CUDA_CHECK(cudaEventRecord(stop));
+            CUDA_CHECK(cudaEventSynchronize(stop));
+            CUDA_CHECK(cudaEventElapsedTime(&gpu_ms, start, stop));
 
-            // TODO: Print CSV line: N,block_size,cpu_ms,gpu_ms
-            // YOUR CODE HERE
+            // Print CSV line: N,block_size,cpu_ms,gpu_ms
+            printf("%d,%d,%.3f,%.3f\n", n, bs, cpu_ms, gpu_ms);
         }
 
-        // TODO: Clean up — destroy events, free GPU and CPU memory
-        // YOUR CODE HERE
+        // Clean up — destroy events, free GPU and CPU memory
+        CUDA_CHECK(cudaEventDestroy(start));
+        CUDA_CHECK(cudaEventDestroy(stop));
+        CUDA_CHECK(cudaFree(d_A));
+        CUDA_CHECK(cudaFree(d_B));
+        CUDA_CHECK(cudaFree(d_C));
+        free(h_A);
+        free(h_B);
+        free(h_C);
     }
 
     return 0;

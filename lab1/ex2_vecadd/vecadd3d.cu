@@ -16,13 +16,19 @@
 #define NY 128
 #define NZ 64
 
-// TODO: Implement the 3D addition kernel.
+// Implement the 3D addition kernel.
 // Use blockIdx.x/y/z and threadIdx.x/y/z to compute (x, y, z).
 // Don't forget bounds check (x < nx && y < ny && z < nz).
 // Convert 3D index to flat: idx = z * ny * nx + y * nx + x
 __global__ void add3d_kernel(const float *a, const float *b, float *c,
                              int nx, int ny, int nz) {
-    // YOUR CODE HERE
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    int z = blockIdx.z * blockDim.z + threadIdx.z;
+    if (x < nx && y < ny && z < nz) {
+        int idx = z * ny * nx + y * nx + x;
+        c[idx] = a[idx] + b[idx];
+    }
 }
 
 int main() {
@@ -46,12 +52,13 @@ int main() {
     CUDA_CHECK(cudaMemcpy(d_a, h_a, size, cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_b, h_b, size, cudaMemcpyHostToDevice));
 
-    // TODO: Set up 3D block and grid dimensions using dim3.
+    // Set up 3D block and grid dimensions using dim3.
     // Use block(8, 8, 8) and compute grid to cover NX x NY x NZ.
-    // YOUR CODE HERE
+    dim3 block(8, 8, 8);
+    dim3 grid((NX + block.x - 1) / block.x, (NY + block.y - 1) / block.y, (NZ + block.z - 1) / block.z);
 
-    // TODO: Launch add3d_kernel with <<<grid, block>>>
-    // YOUR CODE HERE
+    // Launch add3d_kernel with <<<grid, block>>>
+    add3d_kernel<<<grid, block>>>(d_a, d_b, d_c, NX, NY, NZ);
 
     CUDA_CHECK(cudaMemcpy(h_c, d_c, size, cudaMemcpyDeviceToHost));
 

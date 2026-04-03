@@ -17,15 +17,17 @@
 __global__ void vecadd_kernel(const float *a, const float *b, float *c, int n) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n)
-        // c[...] = a[...] ... b[...]; @TODO
+        c[i] = a[i] + b[i]; 
+        // c[...] = a[...] ... b[...]; 
 }
 
 int main() {
     size_t size = N * sizeof(float);
 
     float *h_a = (float *)malloc(size);
-    float *h_b = //@TODO
-    //@TODO
+    float *h_b = (float *)malloc(size);
+    float *h_c = (float *)malloc(size);
+    
 
     for (int i = 0; i < N; i++) {
         h_a[i] = (float)i;
@@ -35,16 +37,18 @@ int main() {
     float *d_a, *d_b, *d_c;
     CUDA_CHECK(cudaMalloc(&d_a, size));
     CUDA_CHECK(cudaMalloc(&d_b, size));
-    // CUDA_CHECK(...); @TODO
+    CUDA_CHECK(cudaMalloc(&d_c, size));
+
 
     CUDA_CHECK(cudaMemcpy(d_a, h_a, size, cudaMemcpyHostToDevice));
-    // CUDA_CHECK(...); @TODO
+    CUDA_CHECK(cudaMemcpy(d_b, h_b, size, cudaMemcpyHostToDevice));
+
 
     int threads = 256;
     int blocks = (N + threads - 1) / threads;
-    // vecadd_kernel<<<blocks, threads>>>(d_a, ..., d_c, ...); @TODO
+    vecadd_kernel<<<blocks, threads>>>(d_a, d_b, d_c, N); 
 
-    // CUDA_CHECK(cudaMemcpy(..., ..., size, ...));
+    CUDA_CHECK(cudaMemcpy(h_c, d_c, size, cudaMemcpyDeviceToHost));
 
     int pass = 1;
     for (int i = 0; i < N; i++) {
