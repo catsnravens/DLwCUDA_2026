@@ -32,7 +32,7 @@ __device__ unsigned int lcg_rand(unsigned int *state) {
 //   f3 (7%):  largest left leaflet
 //   f4 (7%):  largest right leaflet
 //
-// TODO: Implement the 4 affine transformations.
+// Implement the 4 affine transformations.
 // Use (r % 1000) / 1000.0f as a probability in [0, 1).
 // The coefficients are:
 //   f1: nx = 0,                         ny = 0.16 * y
@@ -41,7 +41,23 @@ __device__ unsigned int lcg_rand(unsigned int *state) {
 //   f4: nx = -0.15*x + 0.28*y,          ny = 0.26*x + 0.24*y + 0.44
 __device__ void fern_transform(float x, float y, float *nx, float *ny, unsigned int r) {
     float p = (r % 1000) / 1000.0f;
-    // YOUR CODE HERE
+    if (p < 0.01f) {
+        // f1: stem
+        *nx = 0.0f;
+        *ny = 0.16f * y;
+    } else if (p < 0.86f) {
+        // f2: successively smaller leaflets
+        *nx = 0.85f * x + 0.04f * y;
+        *ny = -0.04f * x + 0.85f * y + 1.6f;
+    } else if (p < 0.93f) {
+        // f3: largest left leaflet
+        *nx = 0.20f * x - 0.26f * y;
+        *ny = 0.23f * x + 0.22f * y + 1.6f;
+    } else {
+        // f4: largest right leaflet
+        *nx = -0.15f * x + 0.28f * y;
+        *ny = 0.26f * x + 0.24f * y + 0.44f;
+    }
 }
 
 // TODO: Implement the fern kernel.
@@ -57,7 +73,24 @@ __device__ void fern_transform(float x, float y, float *nx, float *ny, unsigned 
 //      d. If (px, py) is in bounds, increment histogram[py * width + px]
 //         using atomicAdd
 __global__ void fern_kernel(int *histogram, int width, int height, int iters) {
-    // YOUR CODE HERE
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned int state = tid; // Seed RNG with unique thread ID
+
+    float x = 0.0f, y = 0.0f;
+    for (int i = 0; i < iters; i++) {
+        unsigned int r = lcg_rand(&state);
+        float nx, ny;
+        fern_transform(x, y, &nx, &ny, r);
+        x = nx;
+        y = ny;
+
+        int px = (int)((x + 2.182f) / 4.84f * width);
+        int py = (int)((9.998f - y) / 9.998f * height);
+        if (px >= 0 && px < width && py >= 0 && py < height) {
+            atomicAdd(&histogram[py * width + px], 1);
+        }
+    }
+
 }
 
 void save_bmp(const char *filename, const int *hist, int width, int height) {
@@ -101,12 +134,13 @@ void save_bmp(const char *filename, const int *hist, int width, int height) {
 int main() {
     size_t size = WIDTH * HEIGHT * sizeof(int);
 
-    // TODO: Allocate GPU memory for the histogram and zero it out
+    // Allocate GPU memory for the histogram and zero it out
     int *d_hist;
-    // YOUR CODE HERE
+    CUDA_CHECK(cudaMalloc(&d_hist, size));
+    CUDA_CHECK(cudaMemset(d_hist, 0, size));
 
-    // TODO: Launch the fern_kernel
-    // YOUR CODE HERE
+    // Launch the fern_kernel
+    fern_kernel<<<BLOCKS, THREADS>>>(d_hist, WIDTH, HEIGHT, ITERS);
     CUDA_CHECK(cudaDeviceSynchronize());
 
     // Copy result back and save
